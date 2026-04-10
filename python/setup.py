@@ -61,10 +61,10 @@ setup(
             "matplotlib>=3.4.0,<4.0.0",
         ],
         "interactive": [
-            "plotly>=5.0.0,<6.0.0",
+            "plotly>=5.0.0,<7.0.0",
         ],
         "dashboard": [
-            "plotly>=5.0.0,<6.0.0",
+            "plotly>=5.0.0,<7.0.0",
             "dash>=2.0.0,<3.0.0",
         ],
         "dataframe": [
@@ -79,7 +79,7 @@ setup(
         ],
         "full": [
             "matplotlib>=3.4.0,<4.0.0",
-            "plotly>=5.0.0,<6.0.0",
+            "plotly>=5.0.0,<7.0.0",
             "pandas>=1.3.0,<3.0.0",
             "weasyprint>=52.0,<64.0",
         ],
