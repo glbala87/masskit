@@ -13,8 +13,11 @@ import base64
 import zlib
 import re
 import json
+import logging
 import numpy as np
 import xml.etree.ElementTree as ET
+
+logger = logging.getLogger(__name__)
 
 from .spectrum import Spectrum, SpectrumType, Polarity
 
@@ -294,12 +297,16 @@ class IndexedMzMLReader:
 
     def open(self) -> None:
         """Open file and build index."""
+        logger.info("Opening indexed mzML reader: %s", self.filepath)
         self._file = open(self.filepath, "rb")
         idx_path = self.filepath + ".idx"
         if Path(idx_path).exists():
+            logger.debug("Loading existing index from %s", idx_path)
             self._index = FileIndex.load(idx_path)
         else:
+            logger.debug("Building index for %s", self.filepath)
             self._index = FileIndex.build(self.filepath)
+        logger.info("Indexed %d spectra", self._index.spectrum_count)
 
     def close(self) -> None:
         """Close the file."""
@@ -419,17 +426,27 @@ class IndexedMzMLReader:
                 is_compressed = False
 
                 for param in binary_array.iter("cvParam"):
-                    name = param.get("name", "")
-                    if "m/z" in name:
+                    # Match by accession (stable across mzML versions) with
+                    # name fallback for older / non-standard files.
+                    acc = param.get("accession", "")
+                    name = param.get("name", "").lower()
+                    if acc == "MS:1000514" or "m/z array" in name or "mzarray" in name:
                         is_mz = True
-                    elif "intensity" in name:
+                    elif acc == "MS:1000515" or "intensity array" in name:
                         is_intensity = True
-                    elif "64-bit" in name:
+                    elif acc == "MS:1000523" or "64-bit float" in name:
                         is_64bit = True
-                    elif "32-bit" in name:
+                    elif acc == "MS:1000521" or "32-bit float" in name:
                         is_64bit = False
-                    elif "zlib" in name:
+                    elif acc == "MS:1000574" or "zlib" in name:
                         is_compressed = True
+
+                # Also check arrayLength for auto-detecting precision
+                array_length = 0
+                try:
+                    array_length = int(binary_array.get("arrayLength", "0"))
+                except (ValueError, TypeError):
+                    pass
 
                 binary_elem = binary_array.find("binary")
                 if binary_elem is not None and binary_elem.text:
@@ -437,10 +454,11 @@ class IndexedMzMLReader:
                     if is_compressed:
                         decoded = zlib.decompress(decoded)
 
-                    fmt = "d" if is_64bit else "f"
-                    n_values = len(decoded) // struct.calcsize(fmt)
+                    # Auto-detect precision and endianness (handles mzML 0.99 quirks)
+                    from .io import _auto_detect_precision, _decode_binary_robust
+                    is_64bit = _auto_detect_precision(len(decoded), array_length, is_64bit)
                     values = np.array(
-                        struct.unpack(f"<{n_values}{fmt}", decoded),
+                        _decode_binary_robust(decoded, is_64bit, array_length),
                         dtype=np.float64,
                     )
 
@@ -450,8 +468,21 @@ class IndexedMzMLReader:
                         int_data = values
 
             if mz_data is not None and int_data is not None:
-                spec.mz = mz_data
-                spec.intensity = int_data
+                if len(mz_data) != len(int_data):
+                    logger.warning(
+                        "spectrum %s: m/z and intensity arrays have different "
+                        "lengths (%d vs %d), skipping data",
+                        entry.scan_number, len(mz_data), len(int_data),
+                    )
+                else:
+                    # Re-create spectrum atomically to avoid inconsistent cache
+                    spec = Spectrum(
+                        mz=mz_data,
+                        intensity=int_data,
+                        ms_level=entry.ms_level,
+                        rt=entry.rt,
+                    )
+                    spec.index = entry.scan_number
 
             return spec
 
@@ -593,8 +624,14 @@ class IndexedMzXMLReader:
                 mz_data = np.array(values[0::2], dtype=np.float64)
                 int_data = np.array(values[1::2], dtype=np.float64)
 
-                spec.mz = mz_data
-                spec.intensity = int_data
+                # Re-create spectrum atomically to avoid inconsistent cache
+                spec = Spectrum(
+                    mz=mz_data,
+                    intensity=int_data,
+                    ms_level=entry.ms_level,
+                    rt=entry.rt,
+                )
+                spec.index = entry.scan_number
 
             return spec
 

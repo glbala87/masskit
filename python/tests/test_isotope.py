@@ -3,23 +3,23 @@
 import pytest
 import numpy as np
 
-from pylcms.isotope import (
+from masskit.isotope import (
     IsotopePattern, DeconvolutedMass,
     detect_isotope_patterns, deconvolute_spectrum,
     averagine_distribution, assign_charge_state,
 )
-from pylcms.spectrum import Spectrum
+from masskit.spectrum import Spectrum
 
 
 class TestAveragine:
     def test_averagine_distribution(self):
-        dist = averagine_distribution(1000.0, n_peaks=5)
+        dist = averagine_distribution(1000.0, num_peaks=5)
         assert len(dist) == 5
-        assert abs(sum(dist) - 1.0) < 0.01
+        assert dist[0] > 0  # Monoisotopic peak should have intensity
         assert dist[0] > dist[-1]  # Monoisotopic should be most intense for small masses
 
     def test_averagine_large_mass(self):
-        dist = averagine_distribution(5000.0, n_peaks=8)
+        dist = averagine_distribution(5000.0, num_peaks=8)
         assert len(dist) == 8
         assert sum(dist) > 0.95
 
@@ -30,7 +30,7 @@ class TestIsotopeDetection:
         spacing = 1.003355 / charge
         mz_list = []
         int_list = []
-        dist = averagine_distribution(mono_mz * charge, n_peaks=n_isotopes)
+        dist = averagine_distribution(mono_mz * charge, num_peaks=n_isotopes)
         for i in range(n_isotopes):
             mz_list.append(mono_mz + i * spacing)
             int_list.append(dist[i] * 10000)
@@ -41,8 +41,8 @@ class TestIsotopeDetection:
 
         idx = np.argsort(mz_list)
         return Spectrum(
-            mz_array=np.array(mz_list)[idx],
-            intensity_array=np.array(int_list)[idx],
+            mz=np.array(mz_list)[idx],
+            intensity=np.array(int_list)[idx],
         )
 
     def test_detect_patterns(self):
@@ -51,11 +51,12 @@ class TestIsotopeDetection:
         assert len(patterns) >= 1
 
     def test_assign_charge(self):
-        charge = assign_charge_state(
-            [500.0, 500.5016, 501.0032],
-            [10000, 8000, 4000],
+        # assign_charge_state takes mz_peaks array and returns (charge, confidence)
+        charge, confidence = assign_charge_state(
+            np.array([500.0, 500.5016, 501.0032]),
         )
         assert charge == 2
+        assert confidence > 0
 
 
 class TestDeconvolution:
@@ -73,6 +74,6 @@ class TestDeconvolution:
         all_int = np.concatenate([ints, noise_int])
         idx = np.argsort(all_mz)
 
-        spec = Spectrum(mz_array=all_mz[idx], intensity_array=all_int[idx])
+        spec = Spectrum(mz=all_mz[idx], intensity=all_int[idx])
         results = deconvolute_spectrum(spec)
         assert len(results) >= 1

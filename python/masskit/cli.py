@@ -1,16 +1,16 @@
 """
-Command-line interface for PyLCMS toolkit.
+Command-line interface for MassKit toolkit.
 
 Provides subcommands for common LC-MS data analysis tasks.
 
 Usage:
-    pylcms info <file>           Show file information
-    pylcms peaks <file>          Pick peaks and export
-    pylcms convert <file> -o out Convert between formats
-    pylcms xic <file> --mz 500   Extract ion chromatogram
-    pylcms quantify <files...>   Label-free quantification
-    pylcms search <file> --lib   Spectral library search
-    pylcms qc <files...>         Quality control report
+    masskit info <file>           Show file information
+    masskit peaks <file>          Pick peaks and export
+    masskit convert <file> -o out Convert between formats
+    masskit xic <file> --mz 500   Extract ion chromatogram
+    masskit quantify <files...>   Label-free quantification
+    masskit search <file> --lib   Spectral library search
+    masskit qc <files...>         Quality control report
 """
 
 import argparse
@@ -18,13 +18,21 @@ import sys
 import os
 import json
 import csv
+import logging
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def _load_experiment(filepath: str):
     """Load experiment from mzML or mzXML file."""
     from .io import load_mzml, load_mzxml
+    from .exceptions import FileFormatError
+    from .validation import validate_file_path
+
+    validate_file_path(filepath, must_exist=True)
 
     filepath_lower = filepath.lower()
     if filepath_lower.endswith(".mzxml"):
@@ -32,11 +40,19 @@ def _load_experiment(filepath: str):
     elif filepath_lower.endswith(".mzml"):
         return load_mzml(filepath)
     else:
-        # Try mzML first
+        # Try mzML first, then mzXML
         try:
             return load_mzml(filepath)
-        except Exception:
-            return load_mzxml(filepath)
+        except (ET.ParseError, KeyError, ValueError) as e:
+            logger.debug("mzML parse failed for %s (%s), trying mzXML", filepath, e)
+            try:
+                return load_mzxml(filepath)
+            except (ET.ParseError, KeyError, ValueError) as e2:
+                raise FileFormatError(
+                    filepath,
+                    "Could not parse as mzML or mzXML. "
+                    f"mzML error: {e}, mzXML error: {e2}"
+                ) from e2
 
 
 def cmd_info(args):
@@ -144,7 +160,7 @@ def cmd_convert(args):
 
         workflow = FeatureDetectionWorkflow()
         features = workflow.process(exp)
-        save_mztab(output, features)
+        save_mztab(features, output)
         print(f"Converted to mzTab: {output} ({len(features)} features)")
     else:
         print(f"Format '{args.format}' export not yet supported.", file=sys.stderr)
@@ -261,7 +277,9 @@ def cmd_search(args):
     for spec in ms2_spectra:
         precursor_mz = 0.0
         if spec.precursors:
-            precursor_mz = spec.precursors[0].get("mz", 0.0)
+            prec = spec.precursors[0]
+            # Support both Precursor dataclass and dict (from MGF)
+            precursor_mz = prec.mz if hasattr(prec, "mz") else prec.get("mz", 0.0)
 
         matches = lib.search(
             spec.mz, spec.intensity,
@@ -321,7 +339,8 @@ def cmd_qc(args):
 
             print(f"{name:<40} {n_total:>8} {len(ms1):>6} {len(ms2):>6} "
                   f"{rt_str:>14} {tic_median:>12.0f} {tic_cv:>7.1f}%")
-        except Exception as e:
+        except (OSError, ValueError, ET.ParseError) as e:
+            logger.error("Failed to process %s: %s", filepath, e)
             print(f"{Path(filepath).name:<40} ERROR: {e}", file=sys.stderr)
 
     if args.plot and len(files) > 1:
@@ -351,7 +370,8 @@ def _plot_qc(files: List[str], output: Optional[str] = None):
                 tics = np.array([s.tic for s in ms1])
                 tic_data.append((rts, tics))
                 labels.append(Path(filepath).stem)
-        except Exception:
+        except (OSError, ValueError, ET.ParseError) as e:
+            logger.warning("Skipping %s in QC plot: %s", filepath, e)
             continue
 
     if not tic_data:
@@ -407,10 +427,20 @@ def _plot_qc(files: List[str], output: Optional[str] = None):
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
-        prog="pylcms",
-        description="PyLCMS - LC-MS Data Analysis Toolkit",
+        prog="masskit",
+        description="MassKit - LC-MS Data Analysis Toolkit",
     )
-    parser.add_argument("--version", action="version", version="pylcms 1.0.0")
+    parser.add_argument("--version", action="version", version="masskit 1.0.0")
+    parser.add_argument(
+        "--config",
+        help="Path to JSON/YAML config file (LCMSConfig). "
+             "Values can also be supplied via MASSKIT_* env vars.",
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Override log level",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -477,6 +507,44 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _setup_logging(level_name: str = "WARNING") -> None:
+    """Configure logging for the CLI."""
+    level = getattr(logging, level_name, logging.WARNING)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
+def _load_cli_config(args):
+    """Load LCMSConfig from --config flag, env vars, or defaults."""
+    from .config import LCMSConfig
+    if getattr(args, "config", None):
+        config = LCMSConfig.from_file(args.config)
+    else:
+        config = LCMSConfig.discover()
+    config.validate()
+    return config
+
+
+def _apply_config_defaults(args, config):
+    """Backfill argparse args with config defaults where the CLI didn't override."""
+    # peak picking
+    if hasattr(args, "snr") and args.snr == 3.0:
+        args.snr = config.peak_picking.min_snr
+    if hasattr(args, "min_intensity") and args.min_intensity == 0.0:
+        args.min_intensity = config.peak_picking.min_intensity
+    # quantification
+    if hasattr(args, "mz_tolerance") and args.mz_tolerance == 0.01:
+        args.mz_tolerance = config.quantification.mz_tolerance
+    if hasattr(args, "rt_tolerance") and args.rt_tolerance == 30.0:
+        args.rt_tolerance = config.quantification.rt_tolerance
+    if hasattr(args, "min_presence") and args.min_presence == 0.5:
+        args.min_presence = config.quantification.min_presence
+    return args
+
+
 def main(argv: Optional[List[str]] = None):
     """Main entry point for the CLI."""
     parser = create_parser()
@@ -485,6 +553,19 @@ def main(argv: Optional[List[str]] = None):
     if args.command is None:
         parser.print_help()
         return 0
+
+    # Load config (file > env > defaults), then apply to argparse defaults
+    try:
+        config = _load_cli_config(args)
+    except Exception as e:
+        logger.error("Failed to load config: %s", e)
+        print(f"Error loading config: {e}", file=sys.stderr)
+        return 1
+
+    log_level = args.log_level or config.log_level
+    _setup_logging(log_level)
+
+    args = _apply_config_defaults(args, config)
 
     commands = {
         "info": cmd_info,

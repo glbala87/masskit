@@ -100,8 +100,13 @@ class Spectrum:
         else:
             self._intensity = np.array([], dtype=np.float64)
 
-        if len(self._mz) != len(self._intensity):
-            raise ValueError("m/z and intensity arrays must have same length")
+        # Use the validation helper if it can be imported (avoids circular at import time)
+        try:
+            from .validation import validate_mz_intensity
+            validate_mz_intensity(self._mz, self._intensity)
+        except ImportError:
+            if len(self._mz) != len(self._intensity):
+                raise ValueError("m/z and intensity arrays must have same length")
 
         self.ms_level = ms_level
         self.rt = rt
@@ -116,11 +121,20 @@ class Spectrum:
 
     def _update_cache(self) -> None:
         """Update cached statistics."""
-        if len(self._intensity) > 0:
+        # Defensive: arrays may temporarily mismatch when setters are called
+        # independently. Fall back to safe defaults rather than crashing.
+        if len(self._intensity) > 0 and len(self._intensity) == len(self._mz):
             self._tic = float(np.sum(self._intensity))
             max_idx = int(np.argmax(self._intensity))
             self._base_peak_intensity = float(self._intensity[max_idx])
             self._base_peak_mz = float(self._mz[max_idx])
+            self._mz_min = float(np.min(self._mz))
+            self._mz_max = float(np.max(self._mz))
+        elif len(self._mz) > 0:
+            # m/z set but intensity not yet matching — provide partial info
+            self._tic = float(np.sum(self._intensity)) if len(self._intensity) > 0 else 0.0
+            self._base_peak_intensity = 0.0
+            self._base_peak_mz = 0.0
             self._mz_min = float(np.min(self._mz))
             self._mz_max = float(np.max(self._mz))
         else:

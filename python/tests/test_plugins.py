@@ -2,7 +2,7 @@
 
 import pytest
 
-from pylcms.plugins import (
+from masskit.plugins import (
     PluginRegistry,
     PluginInfo,
     ProcessingPipeline,

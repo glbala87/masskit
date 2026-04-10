@@ -146,7 +146,9 @@ def pick_peaks(
 
         # Calculate area (trapezoidal)
         if right > left:
-            peak.area = np.trapz(intensity[left : right + 1], mz[left : right + 1])
+            # np.trapezoid for numpy>=2.0, np.trapz for older
+            _trap = getattr(np, "trapezoid", np.trapz)
+            peak.area = _trap(intensity[left : right + 1], mz[left : right + 1])
 
         # Calculate FWHM
         half_max = intensity[i] / 2

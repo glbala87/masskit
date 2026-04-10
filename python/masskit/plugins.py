@@ -1,5 +1,5 @@
 """
-Plugin architecture for PyLCMS.
+Plugin architecture for MassKit.
 
 Allows users to register custom algorithms, file readers/writers,
 and processing steps without modifying the core library.
@@ -27,7 +27,7 @@ class PluginInfo:
 
 class PluginRegistry:
     """
-    Central registry for PyLCMS plugins.
+    Central registry for MassKit plugins.
 
     Plugins can be registered programmatically or discovered from
     installed packages via entry points.
@@ -210,11 +210,11 @@ class PluginRegistry:
 
     # --- Discovery ---
 
-    def discover_plugins(self, namespace: str = "pylcms_plugins") -> int:
+    def discover_plugins(self, namespace: str = "masskit_plugins") -> int:
         """
         Discover and load plugins from installed packages.
 
-        Searches for packages in the given namespace (default: pylcms_plugins).
+        Searches for packages in the given namespace (default: masskit_plugins).
         Plugin packages should have a `register(registry)` function.
 
         Args:

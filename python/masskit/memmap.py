@@ -15,7 +15,7 @@ import numpy as np
 @dataclass
 class MemmapConfig:
     """Configuration for memory-mapped storage."""
-    base_dir: str = ".pylcms_cache"
+    base_dir: str = ".masskit_cache"
     dtype: str = "float64"
     mode: str = "r+"  # 'r+', 'w+', 'c' (copy-on-write)
     chunk_size: int = 10000  # rows per chunk for streaming writes

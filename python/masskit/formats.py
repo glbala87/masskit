@@ -38,6 +38,8 @@ def load_mgf(filepath: str) -> MSExperiment:
         >>> exp = load_mgf("tandem_spectra.mgf")
         >>> print(f"Loaded {exp.num_spectra} MS/MS spectra")
     """
+    from .validation import validate_file_path
+    validate_file_path(filepath, must_exist=True)
     exp = MSExperiment()
     exp.metadata["source_file"] = filepath
     exp.metadata["format"] = "MGF"
@@ -126,6 +128,8 @@ def save_mgf(
     Returns:
         Number of spectra written
     """
+    from .validation import validate_output_path
+    validate_output_path(filepath)
     count = 0
     with open(filepath, "w") as f:
         for spec in experiment.spectra:
@@ -194,9 +198,9 @@ def save_feature_table(
 
         if include_header:
             writer.writerow([
-                "feature_id", "mz", "rt", "intensity", "area",
-                "charge", "quality", "rt_start", "rt_end",
-                "mz_start", "mz_end", "neutral_mass",
+                "feature_id", "mz", "rt", "intensity", "volume",
+                "charge", "quality", "rt_min", "rt_max",
+                "mz_min", "mz_max", "neutral_mass",
             ])
 
         for i, feat in enumerate(features):
@@ -206,13 +210,13 @@ def save_feature_table(
                 f"{feat.mz:.6f}",
                 f"{feat.rt:.2f}",
                 f"{feat.intensity:.2f}",
-                f"{feat.area:.2f}",
+                f"{feat.volume:.2f}",
                 feat.charge,
                 f"{feat.quality:.4f}",
-                f"{feat.rt_start:.2f}",
-                f"{feat.rt_end:.2f}",
-                f"{feat.mz - feat.mz_width/2:.6f}" if hasattr(feat, 'mz_width') else "",
-                f"{feat.mz + feat.mz_width/2:.6f}" if hasattr(feat, 'mz_width') else "",
+                f"{feat.rt_min:.2f}",
+                f"{feat.rt_max:.2f}",
+                f"{feat.mz_min:.6f}",
+                f"{feat.mz_max:.6f}",
                 f"{neutral_mass:.4f}" if neutral_mass > 0 else "",
             ])
 
@@ -243,15 +247,22 @@ def load_feature_table(
             feat.mz = float(row.get("mz", 0))
             feat.rt = float(row.get("rt", 0))
             feat.intensity = float(row.get("intensity", 0))
-            feat.area = float(row.get("area", 0))
+            # Support both old "area" and new "volume" headers
+            feat.volume = float(row.get("volume", row.get("area", 0)) or 0)
             feat.charge = int(row.get("charge", 0))
             feat.quality = float(row.get("quality", 0))
 
-            rt_start = row.get("rt_start")
-            rt_end = row.get("rt_end")
-            if rt_start and rt_end:
-                feat.rt_start = float(rt_start)
-                feat.rt_end = float(rt_end)
+            rt_min = row.get("rt_min", row.get("rt_start"))
+            rt_max = row.get("rt_max", row.get("rt_end"))
+            if rt_min and rt_max:
+                feat.rt_min = float(rt_min)
+                feat.rt_max = float(rt_max)
+
+            mz_min = row.get("mz_min", row.get("mz_start"))
+            mz_max = row.get("mz_max", row.get("mz_end"))
+            if mz_min and mz_max:
+                feat.mz_min = float(mz_min)
+                feat.mz_max = float(mz_max)
 
             features.add(feat)
 

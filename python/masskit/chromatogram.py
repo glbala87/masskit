@@ -215,7 +215,8 @@ class Chromatogram:
             )
             return chrom.compute_area()
 
-        return float(np.trapz(self._intensity, self._rt))
+        _trap = getattr(np, "trapezoid", np.trapz)
+        return float(_trap(self._intensity, self._rt))
 
     def interpolate_at(self, rt: float) -> float:
         """

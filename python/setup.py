@@ -1,26 +1,30 @@
 #!/usr/bin/env python
 """
-Setup script for PyLCMS - Python LC-MS Data Analysis Toolkit.
+Setup script for MassKit - LC-MS Data Analysis Toolkit.
 """
 
 from setuptools import setup, find_packages
 from pathlib import Path
 
-# Read README for long description
-readme_path = Path(__file__).parent.parent / "README.md"
-long_description = ""
-if readme_path.exists():
-    long_description = readme_path.read_text(encoding="utf-8")
+# Read README for long description (prefer the package-local README so that
+# `python -m build` works without the parent repo being available)
+_here = Path(__file__).parent
+for _candidate in (_here / "README.md", _here.parent / "README.md"):
+    if _candidate.exists():
+        long_description = _candidate.read_text(encoding="utf-8")
+        break
+else:
+    long_description = "MassKit - LC-MS Data Analysis Toolkit"
 
 setup(
-    name="pylcms",
+    name="masskit",
     version="1.0.0",
-    author="LCMS Toolkit Contributors",
+    author="MassKit Contributors",
     author_email="",
-    description="Python LC-MS Data Analysis Toolkit",
+    description="MassKit - LC-MS Data Analysis Toolkit",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/lcms-toolkit/lcms-toolkit",
+    url="https://github.com/masskit/masskit",
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -44,57 +48,57 @@ setup(
         "mzml",
         "mzxml",
         "bioinformatics",
+        "masskit",
     ],
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[
-        "numpy>=1.20.0",
-        "scipy>=1.7.0",
+        "numpy>=1.20.0,<3.0.0",
+        "scipy>=1.7.0,<2.0.0",
     ],
     extras_require={
         "viz": [
-            "matplotlib>=3.4.0",
+            "matplotlib>=3.4.0,<4.0.0",
         ],
         "interactive": [
-            "plotly>=5.0.0",
+            "plotly>=5.0.0,<6.0.0",
         ],
         "dashboard": [
-            "plotly>=5.0.0",
-            "dash>=2.0.0",
+            "plotly>=5.0.0,<6.0.0",
+            "dash>=2.0.0,<3.0.0",
         ],
         "dataframe": [
-            "pandas>=1.3.0",
+            "pandas>=1.3.0,<3.0.0",
         ],
         "report": [
-            "weasyprint>=52.0",
+            "weasyprint>=52.0,<64.0",
         ],
         "cloud": [
-            "dask[distributed]>=2022.1.0",
-            "boto3>=1.20.0",
+            "dask[distributed]>=2022.1.0,<2025.0.0",
+            "boto3>=1.20.0,<2.0.0",
         ],
         "full": [
-            "matplotlib>=3.4.0",
-            "plotly>=5.0.0",
-            "pandas>=1.3.0",
-            "weasyprint>=52.0",
+            "matplotlib>=3.4.0,<4.0.0",
+            "plotly>=5.0.0,<6.0.0",
+            "pandas>=1.3.0,<3.0.0",
+            "weasyprint>=52.0,<64.0",
         ],
         "dev": [
-            "pytest>=7.0.0",
-            "pytest-cov>=3.0.0",
-            "black>=22.0.0",
-            "isort>=5.10.0",
-            "mypy>=0.950",
-            "flake8>=4.0.0",
+            "pytest>=7.0.0,<9.0.0",
+            "pytest-cov>=3.0.0,<6.0.0",
+            "black>=22.0.0,<25.0.0",
+            "isort>=5.10.0,<6.0.0",
+            "mypy>=0.950,<2.0.0",
+            "flake8>=4.0.0,<8.0.0",
         ],
     },
     entry_points={
         "console_scripts": [
-            "pylcms=pylcms.cli:main",
+            "masskit=masskit.cli:main",
         ],
     },
     project_urls={
-        "Bug Reports": "https://github.com/lcms-toolkit/lcms-toolkit/issues",
-        "Source": "https://github.com/lcms-toolkit/lcms-toolkit",
-        "Documentation": "https://lcms-toolkit.readthedocs.io/",
+        "Bug Reports": "https://github.com/masskit/masskit/issues",
+        "Source": "https://github.com/masskit/masskit",
     },
 )

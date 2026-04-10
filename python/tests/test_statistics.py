@@ -3,12 +3,12 @@
 import pytest
 import numpy as np
 
-from pylcms.statistics import (
+from masskit.statistics import (
     pca, plsda, anova, volcano_data,
     PCAResult, PLSDAResult, ANOVAResult,
     _benjamini_hochberg,
 )
-from pylcms.quantification import ConsensusMap
+from masskit.quantification import ConsensusMap
 
 
 def _make_consensus(n_features=50, n_samples=12):

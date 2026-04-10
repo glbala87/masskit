@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from pylcms.labeling import (
+from masskit.labeling import (
     LabelingStrategy,
     get_reporter_ions,
     extract_reporter_ions,
@@ -14,7 +14,7 @@ from pylcms.labeling import (
     ReporterIonQuantification,
     TMT6_REPORTERS,
 )
-from pylcms.spectrum import Spectrum
+from masskit.spectrum import Spectrum
 
 
 class TestReporterIons:
@@ -43,8 +43,8 @@ class TestExtractReporters:
         idx = np.argsort(mz_list)
 
         spec = Spectrum(
-            mz_array=np.array(mz_list)[idx],
-            intensity_array=np.array(int_list, dtype=float)[idx],
+            mz=np.array(mz_list)[idx],
+            intensity=np.array(int_list, dtype=float)[idx],
         )
 
         result = extract_reporter_ions(spec, LabelingStrategy.TMT6)

@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from pylcms.rt_prediction import (
+from masskit.rt_prediction import (
     compute_peptide_features,
     RTPredictor,
     RTPrediction,

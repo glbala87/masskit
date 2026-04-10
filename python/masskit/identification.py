@@ -12,6 +12,9 @@ import numpy as np
 import re
 import subprocess
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .spectrum import Spectrum
 from .experiment import MSExperiment
@@ -200,7 +203,11 @@ class SimpleDatabaseSearch:
         Returns:
             Number of peptides generated
         """
+        from .validation import validate_file_path
+        validate_file_path(filepath, must_exist=True)
+        logger.info("Loading FASTA database: %s", filepath)
         self.proteins = _parse_fasta(filepath)
+        logger.info("Loaded %d proteins from FASTA", len(self.proteins))
 
         for accession, sequence in self.proteins.items():
             peptides = _digest(sequence, enzyme, missed_cleavages,
@@ -234,6 +241,7 @@ class SimpleDatabaseSearch:
             List of PeptideSpectrumMatch objects
         """
         ms2_spectra = [s for s in experiment.spectra if s.ms_level == 2]
+        logger.info("Searching %d MS2 spectra against %d peptides", len(ms2_spectra), len(self.peptides))
         results = []
 
         # Build peptide mass index
@@ -247,8 +255,11 @@ class SimpleDatabaseSearch:
                 continue
 
             precursor = spec.precursors[0]
-            obs_mz = precursor.get("mz", 0)
-            charge = precursor.get("charge", 2)
+            # Support both Precursor dataclass and dict
+            obs_mz = precursor.mz if hasattr(precursor, "mz") else precursor.get("mz", 0)
+            charge = precursor.charge if hasattr(precursor, "charge") else precursor.get("charge", 2)
+            if charge == 0:
+                charge = 2
             obs_mass = (obs_mz - PROTON_MASS) * charge
 
             # Find candidate peptides within tolerance
@@ -520,6 +531,7 @@ def run_external_search(
     else:
         raise ValueError(f"Unknown search tool: {tool}")
 
+    logger.info("Running external search: %s", " ".join(cmd))
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
         if result.returncode == 0:
@@ -527,7 +539,15 @@ def run_external_search(
             for ext in [".pepXML", ".tsv", ".pin"]:
                 candidates = list(Path(output_dir).glob(f"*{ext}"))
                 if candidates:
+                    logger.info("Search completed, results: %s", candidates[0])
                     return str(candidates[0])
+            logger.warning("Search completed but no output file found in %s", output_dir)
+        else:
+            logger.error("Search engine returned code %d: %s", result.returncode, result.stderr[:500])
         return None
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except subprocess.TimeoutExpired:
+        logger.error("Search engine timed out after 3600s")
+        return None
+    except FileNotFoundError:
+        logger.error("Search engine executable not found: %s", cmd[0])
         return None

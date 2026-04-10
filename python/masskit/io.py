@@ -3,11 +3,124 @@ I/O functions for reading and writing LC-MS data files.
 """
 
 import base64
+import binascii
 import struct
 import zlib
+import logging
 from typing import Optional, List, Dict, Any, Callable
 from pathlib import Path
 import xml.etree.ElementTree as ET
+
+logger = logging.getLogger(__name__)
+
+
+def _find_first(*candidates):
+    """Return the first non-None Element from candidates (avoids truthy checks)."""
+    for c in candidates:
+        if c is not None:
+            return c
+    return None
+
+
+def _findall_any(elem, ns_path: str, plain_path: str, ns: Dict[str, str]) -> List[ET.Element]:
+    """findall with namespace fallback (avoids truthy 'or' on lists)."""
+    result = elem.findall(ns_path, ns)
+    if result:
+        return result
+    return elem.findall(plain_path)
+
+
+def _iter_descendants_any(elem, tag: str, ns: Dict[str, str]):
+    """
+    Iterate over all descendants matching a local tag, regardless of namespace.
+
+    Used to locate cvParam/scan/binaryDataArray elements which may live inside
+    different parent hierarchies across mzML versions (1.1 uses scanList/
+    binaryDataArrayList wrappers, 0.99 uses spectrumDescription wrapping and
+    direct binaryDataArray children).
+    """
+    yielded = set()
+    if ns:
+        for e in elem.iter(f"{{{list(ns.values())[0]}}}{tag}"):
+            yielded.add(id(e))
+            yield e
+    for e in elem.iter(tag):
+        if id(e) not in yielded:
+            yield e
+
+
+def _auto_detect_precision(decoded_bytes: int, array_length: int, declared_64bit: bool) -> bool:
+    """
+    Infer actual binary precision from byte count, correcting for mislabeled
+    mzML 0.99 files that declare 32-bit but actually contain 64-bit data.
+
+    Returns True for 64-bit, False for 32-bit.
+    """
+    if array_length <= 0:
+        return declared_64bit
+    per_element = decoded_bytes / array_length
+    if abs(per_element - 8.0) < 0.01:
+        return True
+    if abs(per_element - 4.0) < 0.01:
+        return False
+    return declared_64bit
+
+
+def _decode_binary_robust(
+    decoded_bytes: bytes,
+    is_64bit: bool,
+    array_length: int = 0,
+) -> List[float]:
+    """
+    Decode a binary blob into floats, auto-detecting endianness when the
+    declared layout produces non-physical values (extreme magnitudes or NaN).
+
+    mzML 1.1 mandates little-endian but some mzML 0.99 files use big-endian.
+    This helper tries little-endian first and falls back to big-endian if
+    the decoded values look corrupt.
+    """
+    import math
+
+    size = 8 if is_64bit else 4
+    fmt = "d" if is_64bit else "f"
+    count = len(decoded_bytes) // size
+    if count == 0:
+        return []
+
+    # First: little-endian (spec-compliant)
+    le_values = list(
+        struct.unpack(f"<{count}{fmt}", decoded_bytes[: count * size])
+    )
+
+    def _looks_sensible(values: List[float]) -> bool:
+        # Quick heuristic: sample up to 16 values, reject if any is NaN, inf,
+        # extreme magnitude (> 1e10 or non-zero < 1e-20), or negative.
+        # Real m/z and intensity values are always positive and in a
+        # tractable range.
+        sample = values[: min(16, len(values))]
+        for v in sample:
+            if math.isnan(v) or math.isinf(v):
+                return False
+            if v < 0:
+                return False
+            if v > 1e10:
+                return False
+            if 0 < v < 1e-20:
+                return False  # denormalized: likely wrong endianness
+        return True
+
+    if _looks_sensible(le_values):
+        return le_values
+
+    # Fall back to big-endian
+    be_values = list(
+        struct.unpack(f">{count}{fmt}", decoded_bytes[: count * size])
+    )
+    if _looks_sensible(be_values):
+        return be_values
+
+    # Neither worked — return little-endian anyway and let the caller decide
+    return le_values
 
 from .spectrum import Spectrum, SpectrumType, Polarity, Precursor
 from .chromatogram import Chromatogram, ChromatogramType
@@ -32,6 +145,7 @@ CV_SELECTED_MZ = "MS:1000744"
 CV_CHARGE = "MS:1000041"
 CV_COLLISION_ENERGY = "MS:1000045"
 CV_MINUTE = "UO:0000031"
+CV_MINUTE_MZML099 = "MS:1000038"  # older mzML 0.99 minute unit
 
 
 def decode_binary(
@@ -107,11 +221,20 @@ def load_mzml(
         >>> exp = load_mzml("sample.mzML")
         >>> exp = load_mzml("sample.mzML", ms_levels=[1], rt_range=(60, 300))
     """
+    from .exceptions import FileFormatError
+    from .validation import validate_file_path
+
+    validate_file_path(filename, must_exist=True, allowed_extensions=[".mzML", ".mzml"])
+
+    logger.info("Loading mzML file: %s", filename)
     exp = MSExperiment()
     exp.source_file = filename
 
     # Parse XML
-    tree = ET.parse(filename)
+    try:
+        tree = ET.parse(filename)
+    except ET.ParseError as e:
+        raise FileFormatError(filename, f"Invalid XML: {e}") from e
     root = tree.getroot()
 
     # Handle namespace
@@ -121,29 +244,33 @@ def load_mzml(
         ns = {"mzml": ns_uri}
 
     # Find mzML element (may be inside indexedmzML)
-    mzml = root.find(".//mzml:mzML", ns) or root.find(".//mzML", ns) or root
+    mzml = _find_first(
+        root.find(".//mzml:mzML", ns),
+        root.find(".//mzML", ns),
+        root,
+    )
 
     # Find run element
-    run = (
-        mzml.find("mzml:run", ns)
-        or mzml.find("run", ns)
-        or mzml.find(".//run")
+    run = _find_first(
+        mzml.find("mzml:run", ns),
+        mzml.find("run", ns),
+        mzml.find(".//run"),
     )
     if run is None:
         run = mzml
 
     # Parse spectra
-    spectrum_list = (
-        run.find("mzml:spectrumList", ns)
-        or run.find("spectrumList", ns)
-        or run.find(".//spectrumList")
+    spectrum_list = _find_first(
+        run.find("mzml:spectrumList", ns),
+        run.find("spectrumList", ns),
+        run.find(".//spectrumList"),
     )
 
     if spectrum_list is not None:
         total = int(spectrum_list.get("count", 0))
         loaded = 0
 
-        for spec_elem in spectrum_list.findall("mzml:spectrum", ns) or spectrum_list.findall("spectrum"):
+        for spec_elem in _findall_any(spectrum_list, "mzml:spectrum", "spectrum", ns):
             if max_spectra > 0 and loaded >= max_spectra:
                 break
 
@@ -163,16 +290,18 @@ def load_mzml(
                 if not progress_callback(loaded, total):
                     break
 
+    logger.debug("Loaded %d spectra from mzML", exp.spectrum_count)
+
     # Parse chromatograms
     if not skip_chromatograms:
-        chrom_list = (
-            run.find("mzml:chromatogramList", ns)
-            or run.find("chromatogramList", ns)
-            or run.find(".//chromatogramList")
+        chrom_list = _find_first(
+            run.find("mzml:chromatogramList", ns),
+            run.find("chromatogramList", ns),
+            run.find(".//chromatogramList"),
         )
 
         if chrom_list is not None:
-            for chrom_elem in chrom_list.findall("mzml:chromatogram", ns) or chrom_list.findall("chromatogram"):
+            for chrom_elem in _findall_any(chrom_list, "mzml:chromatogram", "chromatogram", ns):
                 chrom = _parse_chromatogram(chrom_elem, ns)
                 exp.add_chromatogram(chrom)
 
@@ -180,17 +309,41 @@ def load_mzml(
 
 
 def _parse_spectrum(elem: ET.Element, ns: Dict[str, str]) -> Spectrum:
-    """Parse a spectrum element."""
+    """
+    Parse a spectrum element.
+
+    Supports both mzML 1.1.x (scanList, binaryDataArrayList wrappers) and
+    mzML 0.99.x (spectrumDescription wrapper, direct binaryDataArray children,
+    msLevel as spectrum attribute, and often-mislabeled binary precision).
+    """
     spec = Spectrum()
     spec.native_id = elem.get("id", "")
 
-    # Parse cvParams
-    for cv in elem.findall("mzml:cvParam", ns) or elem.findall("cvParam"):
+    # mzML 0.99: msLevel is an attribute of <spectrum>
+    if elem.get("msLevel"):
+        try:
+            spec.ms_level = int(elem.get("msLevel"))
+        except ValueError:
+            pass
+
+    # Collect cvParams from the spectrum itself AND from spectrumDescription (0.99)
+    cvparams: List[ET.Element] = list(_findall_any(elem, "mzml:cvParam", "cvParam", ns))
+    spec_desc = _find_first(
+        elem.find("mzml:spectrumDescription", ns),
+        elem.find("spectrumDescription"),
+    )
+    if spec_desc is not None:
+        cvparams.extend(_findall_any(spec_desc, "mzml:cvParam", "cvParam", ns))
+
+    for cv in cvparams:
         acc = cv.get("accession", "")
         value = cv.get("value", "")
 
         if acc == CV_MS_LEVEL:
-            spec.ms_level = int(value)
+            try:
+                spec.ms_level = int(value)
+            except ValueError:
+                pass
         elif acc == CV_PROFILE:
             spec.spectrum_type = SpectrumType.PROFILE
         elif acc == CV_CENTROID:
@@ -200,63 +353,138 @@ def _parse_spectrum(elem: ET.Element, ns: Dict[str, str]) -> Spectrum:
         elif acc == CV_NEGATIVE:
             spec.polarity = Polarity.NEGATIVE
 
-    # Parse scan list for RT
-    scan_list = elem.find("mzml:scanList", ns) or elem.find("scanList")
+    # Parse scan — may be inside scanList (1.1) or spectrumDescription (0.99)
+    scan = None
+    scan_list = _find_first(
+        elem.find("mzml:scanList", ns),
+        elem.find("scanList"),
+    )
     if scan_list is not None:
-        scan = scan_list.find("mzml:scan", ns) or scan_list.find("scan")
-        if scan is not None:
-            for cv in scan.findall("mzml:cvParam", ns) or scan.findall("cvParam"):
-                if cv.get("accession") == CV_SCAN_TIME:
-                    rt = float(cv.get("value", 0))
-                    if cv.get("unitAccession") == CV_MINUTE:
-                        rt *= 60.0
-                    spec.rt = rt
+        scan = _find_first(scan_list.find("mzml:scan", ns), scan_list.find("scan"))
+    if scan is None and spec_desc is not None:
+        scan = _find_first(
+            spec_desc.find("mzml:scan", ns),
+            spec_desc.find("scan"),
+        )
 
-    # Parse precursors
-    prec_list = elem.find("mzml:precursorList", ns) or elem.find("precursorList")
+    if scan is not None:
+        for cv in _findall_any(scan, "mzml:cvParam", "cvParam", ns):
+            if cv.get("accession") == CV_SCAN_TIME:
+                try:
+                    rt = float(cv.get("value", 0))
+                except ValueError:
+                    continue
+                unit = cv.get("unitAccession", "")
+                unit_name = (cv.get("unitName") or "").lower()
+                if unit == CV_MINUTE or unit == CV_MINUTE_MZML099 or unit_name == "minute":
+                    rt *= 60.0
+                spec.rt = rt
+
+    # Parse precursors — same structure in 0.99 and 1.1
+    prec_list = _find_first(
+        elem.find("mzml:precursorList", ns),
+        elem.find("precursorList"),
+    )
     if prec_list is not None:
-        for prec_elem in prec_list.findall("mzml:precursor", ns) or prec_list.findall("precursor"):
+        for prec_elem in _findall_any(prec_list, "mzml:precursor", "precursor", ns):
             prec = _parse_precursor(prec_elem, ns)
             spec.precursors.append(prec)
 
-    # Parse binary data
-    binary_list = elem.find("mzml:binaryDataArrayList", ns) or elem.find("binaryDataArrayList")
+    # Parse binary data:
+    #   mzML 1.1: spectrum > binaryDataArrayList > binaryDataArray
+    #   mzML 0.99: spectrum > binaryDataArray (direct children)
+    binary_list = _find_first(
+        elem.find("mzml:binaryDataArrayList", ns),
+        elem.find("binaryDataArrayList"),
+    )
     if binary_list is not None:
-        mz_data = []
-        intensity_data = []
+        binary_arrays = _findall_any(
+            binary_list, "mzml:binaryDataArray", "binaryDataArray", ns
+        )
+    else:
+        binary_arrays = _findall_any(
+            elem, "mzml:binaryDataArray", "binaryDataArray", ns
+        )
 
-        for binary in binary_list.findall("mzml:binaryDataArray", ns) or binary_list.findall("binaryDataArray"):
-            is_mz = False
-            is_intensity = False
-            is_64bit = True
-            is_compressed = False
+    mz_data: List[float] = []
+    intensity_data: List[float] = []
 
-            for cv in binary.findall("mzml:cvParam", ns) or binary.findall("cvParam"):
-                acc = cv.get("accession", "")
-                if acc == CV_MZ_ARRAY:
-                    is_mz = True
-                elif acc == CV_INTENSITY_ARRAY:
-                    is_intensity = True
-                elif acc == CV_FLOAT64:
-                    is_64bit = True
-                elif acc == CV_FLOAT32:
-                    is_64bit = False
-                elif acc == CV_ZLIB:
-                    is_compressed = True
+    for binary in binary_arrays:
+        # arrayLength lets us auto-detect the actual precision if the CV
+        # terms are wrong (common in mzML 0.99 files)
+        array_length = 0
+        try:
+            array_length = int(binary.get("arrayLength", "0"))
+        except ValueError:
+            array_length = 0
 
-            data_elem = binary.find("mzml:binary", ns) or binary.find("binary")
-            if data_elem is not None and data_elem.text:
-                values = decode_binary(data_elem.text, is_64bit, is_compressed)
-                if is_mz:
-                    mz_data = values
-                elif is_intensity:
-                    intensity_data = values
+        is_mz = False
+        is_intensity = False
+        is_64bit = True
+        is_compressed = False
 
-        if mz_data:
-            if not intensity_data:
-                intensity_data = [0.0] * len(mz_data)
-            spec.mz = mz_data
-            spec.intensity = intensity_data
+        for cv in _findall_any(binary, "mzml:cvParam", "cvParam", ns):
+            acc = cv.get("accession", "")
+            if acc == CV_MZ_ARRAY:
+                is_mz = True
+            elif acc == CV_INTENSITY_ARRAY:
+                is_intensity = True
+            elif acc == CV_FLOAT64:
+                is_64bit = True
+            elif acc == CV_FLOAT32:
+                is_64bit = False
+            elif acc == CV_ZLIB:
+                is_compressed = True
+
+        data_elem = _find_first(binary.find("mzml:binary", ns), binary.find("binary"))
+        if data_elem is None or not data_elem.text:
+            continue
+
+        # Decode base64 + (maybe) zlib, then auto-detect precision
+        raw = "".join(data_elem.text.split())
+        if not raw:
+            continue
+        try:
+            decoded_bytes = base64.b64decode(raw)
+        except (ValueError, binascii.Error):
+            continue
+        if is_compressed:
+            try:
+                decoded_bytes = zlib.decompress(decoded_bytes)
+            except zlib.error:
+                continue
+
+        is_64bit = _auto_detect_precision(len(decoded_bytes), array_length, is_64bit)
+        values = _decode_binary_robust(decoded_bytes, is_64bit, array_length)
+        if not values:
+            continue
+
+        if is_mz:
+            mz_data = values
+        elif is_intensity:
+            intensity_data = values
+
+    if mz_data:
+        if not intensity_data:
+            intensity_data = [0.0] * len(mz_data)
+        # Atomic assignment via re-construction to avoid inconsistent cache
+        if len(mz_data) == len(intensity_data):
+            saved_precursors = spec.precursors
+            saved_rt = spec.rt
+            saved_ms = spec.ms_level
+            saved_id = spec.native_id
+            saved_type = spec.spectrum_type
+            saved_polarity = spec.polarity
+            spec = Spectrum(
+                mz=mz_data,
+                intensity=intensity_data,
+                ms_level=saved_ms,
+                rt=saved_rt,
+                spectrum_type=saved_type,
+                polarity=saved_polarity,
+            )
+            spec.native_id = saved_id
+            spec.precursors = saved_precursors
 
     return spec
 
@@ -266,9 +494,9 @@ def _parse_precursor(elem: ET.Element, ns: Dict[str, str]) -> Precursor:
     prec = Precursor()
 
     # Parse isolation window
-    isolation = elem.find("mzml:isolationWindow", ns) or elem.find("isolationWindow")
+    isolation = _find_first(elem.find("mzml:isolationWindow", ns), elem.find("isolationWindow"))
     if isolation is not None:
-        for cv in isolation.findall("mzml:cvParam", ns) or isolation.findall("cvParam"):
+        for cv in _findall_any(isolation, "mzml:cvParam", "cvParam", ns):
             acc = cv.get("accession", "")
             value = float(cv.get("value", 0))
             if "1000827" in acc:  # target
@@ -279,11 +507,11 @@ def _parse_precursor(elem: ET.Element, ns: Dict[str, str]) -> Precursor:
                 prec.isolation_window_upper = value
 
     # Parse selected ion
-    selected_list = elem.find("mzml:selectedIonList", ns) or elem.find("selectedIonList")
+    selected_list = _find_first(elem.find("mzml:selectedIonList", ns), elem.find("selectedIonList"))
     if selected_list is not None:
-        selected = selected_list.find("mzml:selectedIon", ns) or selected_list.find("selectedIon")
+        selected = _find_first(selected_list.find("mzml:selectedIon", ns), selected_list.find("selectedIon"))
         if selected is not None:
-            for cv in selected.findall("mzml:cvParam", ns) or selected.findall("cvParam"):
+            for cv in _findall_any(selected, "mzml:cvParam", "cvParam", ns):
                 acc = cv.get("accession", "")
                 value = cv.get("value", "0")
                 if acc == CV_SELECTED_MZ:
@@ -294,9 +522,9 @@ def _parse_precursor(elem: ET.Element, ns: Dict[str, str]) -> Precursor:
                     prec.intensity = float(value)
 
     # Parse activation
-    activation = elem.find("mzml:activation", ns) or elem.find("activation")
+    activation = _find_first(elem.find("mzml:activation", ns), elem.find("activation"))
     if activation is not None:
-        for cv in activation.findall("mzml:cvParam", ns) or activation.findall("cvParam"):
+        for cv in _findall_any(activation, "mzml:cvParam", "cvParam", ns):
             acc = cv.get("accession", "")
             if acc == CV_COLLISION_ENERGY:
                 prec.collision_energy = float(cv.get("value", 0))
@@ -316,7 +544,7 @@ def _parse_chromatogram(elem: ET.Element, ns: Dict[str, str]) -> Chromatogram:
     chrom.native_id = elem.get("id", "")
 
     # Parse cvParams
-    for cv in elem.findall("mzml:cvParam", ns) or elem.findall("cvParam"):
+    for cv in _findall_any(elem, "mzml:cvParam", "cvParam", ns):
         acc = cv.get("accession", "")
         if "1000235" in acc:  # TIC
             chrom.chrom_type = ChromatogramType.TIC
@@ -326,19 +554,19 @@ def _parse_chromatogram(elem: ET.Element, ns: Dict[str, str]) -> Chromatogram:
             chrom.chrom_type = ChromatogramType.SRM
 
     # Parse binary data
-    binary_list = elem.find("mzml:binaryDataArrayList", ns) or elem.find("binaryDataArrayList")
+    binary_list = _find_first(elem.find("mzml:binaryDataArrayList", ns), elem.find("binaryDataArrayList"))
     if binary_list is not None:
         rt_data = []
         intensity_data = []
 
-        for binary in binary_list.findall("mzml:binaryDataArray", ns) or binary_list.findall("binaryDataArray"):
+        for binary in _findall_any(binary_list, "mzml:binaryDataArray", "binaryDataArray", ns):
             is_time = False
             is_intensity = False
             is_64bit = True
             is_compressed = False
             is_minutes = False
 
-            for cv in binary.findall("mzml:cvParam", ns) or binary.findall("cvParam"):
+            for cv in _findall_any(binary, "mzml:cvParam", "cvParam", ns):
                 acc = cv.get("accession", "")
                 unit = cv.get("unitAccession", "")
                 if acc == CV_TIME_ARRAY:
@@ -354,7 +582,7 @@ def _parse_chromatogram(elem: ET.Element, ns: Dict[str, str]) -> Chromatogram:
                 if unit == CV_MINUTE:
                     is_minutes = True
 
-            data_elem = binary.find("mzml:binary", ns) or binary.find("binary")
+            data_elem = _find_first(binary.find("mzml:binary", ns), binary.find("binary"))
             if data_elem is not None and data_elem.text:
                 values = decode_binary(data_elem.text, is_64bit, is_compressed)
                 if is_time:
@@ -391,10 +619,19 @@ def load_mzxml(
     Returns:
         Loaded MSExperiment
     """
+    from .exceptions import FileFormatError
+    from .validation import validate_file_path
+
+    validate_file_path(filename, must_exist=True, allowed_extensions=[".mzXML", ".mzxml"])
+
+    logger.info("Loading mzXML file: %s", filename)
     exp = MSExperiment()
     exp.source_file = filename
 
-    tree = ET.parse(filename)
+    try:
+        tree = ET.parse(filename)
+    except ET.ParseError as e:
+        raise FileFormatError(filename, f"Invalid XML: {e}") from e
     root = tree.getroot()
 
     # Handle namespace
@@ -404,13 +641,17 @@ def load_mzxml(
         ns = {"mzxml": ns_uri}
 
     # Find msRun
-    ms_run = root.find(".//mzxml:msRun", ns) or root.find(".//msRun") or root
+    ms_run = _find_first(
+        root.find(".//mzxml:msRun", ns),
+        root.find(".//msRun"),
+        root,
+    )
 
     loaded = 0
 
     def parse_scans(parent):
         nonlocal loaded
-        for scan in parent.findall("mzxml:scan", ns) or parent.findall("scan"):
+        for scan in _findall_any(parent, "mzxml:scan", "scan", ns):
             if max_spectra > 0 and loaded >= max_spectra:
                 return
 
@@ -468,7 +709,7 @@ def _parse_mzxml_scan(elem: ET.Element, ns: Dict[str, str]) -> Spectrum:
         spec.spectrum_type = SpectrumType.PROFILE
 
     # Parse precursors
-    for prec_elem in elem.findall("mzxml:precursorMz", ns) or elem.findall("precursorMz"):
+    for prec_elem in _findall_any(elem, "mzxml:precursorMz", "precursorMz", ns):
         prec = Precursor()
         prec.mz = float(prec_elem.text or 0)
         prec.intensity = float(prec_elem.get("precursorIntensity", 0))
@@ -476,7 +717,7 @@ def _parse_mzxml_scan(elem: ET.Element, ns: Dict[str, str]) -> Spectrum:
         spec.precursors.append(prec)
 
     # Parse peaks
-    peaks_elem = elem.find("mzxml:peaks", ns) or elem.find("peaks")
+    peaks_elem = _find_first(elem.find("mzxml:peaks", ns), elem.find("peaks"))
     if peaks_elem is not None and peaks_elem.text:
         precision = int(peaks_elem.get("precision", 32))
         byte_order = peaks_elem.get("byteOrder", "network")
@@ -524,7 +765,10 @@ def save_mztab(
         run_id: MS run identifier
     """
     from .feature import FeatureMap
+    from .validation import validate_output_path
 
+    logger.info("Saving mzTab: %s", filename)
+    validate_output_path(filename)
     with open(filename, "w") as f:
         # Metadata section
         f.write("MTD\tmzTab-version\t1.0.0\n")

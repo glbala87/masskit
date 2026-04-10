@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from pylcms.quantification import (
+from masskit.quantification import (
     ConsensusMap,
     median_normalization,
     quantile_normalization,
@@ -14,6 +14,7 @@ from pylcms.quantification import (
 
 class TestConsensusMap:
     def _make_consensus(self, n_features=100, n_samples=6):
+        np.random.seed(42)
         matrix = np.random.lognormal(10, 2, (n_features, n_samples))
         feature_ids = [f"feature_{i}" for i in range(n_features)]
         sample_names = [f"sample_{i}" for i in range(n_samples)]
@@ -28,11 +29,15 @@ class TestConsensusMap:
         assert cm.n_features == 100
         assert cm.n_samples == 6
 
-    def test_filter_missing(self):
+    def test_filter_by_presence(self):
         cm = self._make_consensus()
         cm.intensity_matrix[0:10, 0:3] = 0  # Add missing values
-        filtered = cm.filter_missing(max_missing_fraction=0.3)
+        filtered = cm.filter_by_presence(min_fraction=0.7)
         assert filtered.n_features <= cm.n_features
+
+    def test_shape(self):
+        cm = self._make_consensus()
+        assert cm.shape == (100, 6)
 
 
 class TestNormalization:
@@ -77,7 +82,7 @@ class TestDifferentialAnalysis:
         )
 
         da = DifferentialAnalysis()
-        results = da.analyze(
+        results = da.compare_groups(
             cm,
             group1_samples=["s_0", "s_1", "s_2"],
             group2_samples=["s_3", "s_4", "s_5"],

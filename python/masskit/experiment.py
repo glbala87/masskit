@@ -46,6 +46,11 @@ class MSExperiment:
         return len(self._spectra)
 
     @property
+    def num_spectra(self) -> int:
+        """Alias for spectrum_count (for backwards compatibility)."""
+        return len(self._spectra)
+
+    @property
     def has_spectra(self) -> bool:
         """Check if experiment has spectra."""
         return len(self._spectra) > 0

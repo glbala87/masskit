@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from pylcms.annotation import (
+from masskit.annotation import (
     IonType, NeutralLoss,
     compute_fragment_ions,
     compute_immonium_ions,
@@ -11,7 +11,7 @@ from pylcms.annotation import (
     format_annotation_table,
     AA_MASSES,
 )
-from pylcms.spectrum import Spectrum
+from masskit.spectrum import Spectrum
 
 
 class TestFragmentIons:
@@ -81,8 +81,8 @@ class TestAnnotateSpectrum:
 
         idx = np.argsort(mz_values)
         spec = Spectrum(
-            mz_array=np.array(mz_values)[idx],
-            intensity_array=np.array(int_values)[idx],
+            mz=np.array(mz_values)[idx],
+            intensity=np.array(int_values)[idx],
         )
 
         result = annotate_spectrum(spec, "PEPTIDE", tolerance_da=0.05)
@@ -95,7 +95,7 @@ class TestAnnotateSpectrum:
                                           neutral_losses=[NeutralLoss.NONE])
         mz = np.array([f[0] for f in fragments])
         ints = np.ones(len(mz)) * 1000
-        spec = Spectrum(mz_array=mz, intensity_array=ints)
+        spec = Spectrum(mz=mz, intensity=ints)
         ann = annotate_spectrum(spec, "PEP", tolerance_da=0.05)
         table = format_annotation_table(ann)
         assert "PEP" in table
