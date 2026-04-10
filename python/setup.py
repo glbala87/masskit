@@ -65,7 +65,7 @@ setup(
         ],
         "dashboard": [
             "plotly>=5.0.0,<6.0.0",
-            "dash>=2.0.0,<3.0.0",
+            "dash>=2.0.0,<5.0.0",
         ],
         "dataframe": [
             "pandas>=1.3.0,<3.0.0",
