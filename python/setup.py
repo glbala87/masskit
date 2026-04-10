@@ -71,7 +71,7 @@ setup(
             "pandas>=1.3.0,<3.0.0",
         ],
         "report": [
-            "weasyprint>=52.0,<64.0",
+            "weasyprint>=52.0,<67.0",
         ],
         "cloud": [
             "dask[distributed]>=2022.1.0,<2025.0.0",
@@ -81,7 +81,7 @@ setup(
             "matplotlib>=3.4.0,<4.0.0",
             "plotly>=5.0.0,<6.0.0",
             "pandas>=1.3.0,<3.0.0",
-            "weasyprint>=52.0,<64.0",
+            "weasyprint>=52.0,<67.0",
         ],
         "dev": [
             "pytest>=7.0.0,<9.0.0",
