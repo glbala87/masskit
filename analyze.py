@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LCMS Toolkit - Analyze Real Data
+MassKit - Analyze Real Data
 
 Complete analysis pipeline for mzML/mzXML files.
 Produces peaks, features, chromatograms, QC metrics, and an HTML report.
@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "python"))
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="LCMS Toolkit - Analyze LC-MS data files",
+        description="MassKit - Analyze LC-MS data files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -42,8 +42,8 @@ Examples:
     )
 
     p.add_argument("files", nargs="+", help="Input mzML/mzXML file(s)")
-    p.add_argument("-o", "--output-dir", default="lcms_results",
-                   help="Output directory (default: lcms_results/)")
+    p.add_argument("-o", "--output-dir", default="masskit_results",
+                   help="Output directory (default: masskit_results/)")
 
     # Processing options
     proc = p.add_argument_group("Processing")
@@ -116,7 +116,7 @@ def log(msg, quiet=False):
 
 def load_file(filepath, ms_level=None, rt_range=None):
     """Load an mzML or mzXML file."""
-    from pylcms.io import load_mzml, load_mzxml
+    from masskit.io import load_mzml, load_mzxml
 
     ext = filepath.lower()
     ms_levels = [ms_level] if ms_level else None
@@ -139,8 +139,8 @@ def save_table(rows, headers, filepath, fmt="csv"):
 
 def analyze_single_file(filepath, args, output_dir):
     """Full analysis pipeline for one file."""
-    from pylcms import pick_peaks, smooth_spectrum, correct_baseline, estimate_noise
-    from pylcms.workflows import PeakPickingWorkflow, FeatureDetectionWorkflow
+    from masskit import pick_peaks, smooth_spectrum, correct_baseline, estimate_noise
+    from masskit.workflows import PeakPickingWorkflow, FeatureDetectionWorkflow
 
     basename = os.path.splitext(os.path.basename(filepath))[0]
     log(f"\n{'='*60}", args.quiet)
@@ -254,7 +254,7 @@ def analyze_single_file(filepath, args, output_dir):
     # --- Spectral library search ---
     if args.search and ms2:
         log(f"  Searching against library: {args.search}...", args.quiet)
-        from pylcms.spectral_matching import SpectralLibrary
+        from masskit.spectral_matching import SpectralLibrary
         lib = SpectralLibrary()
         lib.load_mgf(args.search)
         log(f"  Library loaded: {len(lib)} entries", args.quiet)
@@ -284,7 +284,7 @@ def analyze_single_file(filepath, args, output_dir):
     # --- Spectrum annotation ---
     if args.annotate and ms2:
         log(f"  Annotating MS2 spectra with sequence: {args.annotate}...", args.quiet)
-        from pylcms.annotation import annotate_spectrum, format_annotation_table
+        from masskit.annotation import annotate_spectrum, format_annotation_table
 
         ann_rows = []
         for i, spec in enumerate(ms2[:50]):  # annotate up to 50 spectra
@@ -308,7 +308,7 @@ def analyze_single_file(filepath, args, output_dir):
 
     # --- QC metrics ---
     log(f"  Computing QC metrics...", args.quiet)
-    from pylcms.qc import compute_qc_metrics
+    from masskit.qc import compute_qc_metrics
     qc = compute_qc_metrics(exp)
     qc_data = {
         "file": filepath,
@@ -332,7 +332,7 @@ def analyze_single_file(filepath, args, output_dir):
 
 def run_quantification(all_results, args, output_dir):
     """Run label-free quantification across multiple files."""
-    from pylcms.quantification import median_normalization, quantile_normalization, tic_normalization
+    from masskit.quantification import median_normalization, quantile_normalization, tic_normalization
 
     log(f"\n{'='*60}", args.quiet)
     log(f"  Multi-file Quantification ({len(all_results)} files)", args.quiet)
@@ -342,18 +342,18 @@ def run_quantification(all_results, args, output_dir):
     # Re-run feature detection if not already done.
     log("  Note: Full consensus map quantification requires feature alignment.", args.quiet)
     log("  Use the Python API for advanced multi-file workflows:", args.quiet)
-    log("    from pylcms.quantification import FeatureAlignment, ConsensusMap", args.quiet)
-    log("    from pylcms.statistics import pca, anova", args.quiet)
+    log("    from masskit.quantification import FeatureAlignment, ConsensusMap", args.quiet)
+    log("    from masskit.statistics import pca, anova", args.quiet)
 
 
 def generate_report(all_results, args, output_dir):
     """Generate HTML analysis report."""
-    from pylcms.reporting import ReportBuilder, ReportConfig
+    from masskit.reporting import ReportBuilder, ReportConfig
 
     log(f"\n  Generating HTML report...", args.quiet)
 
     builder = ReportBuilder(ReportConfig(
-        title="LCMS Toolkit Analysis Report",
+        title="MassKit Analysis Report",
     ))
 
     for r in all_results:
@@ -389,7 +389,7 @@ def main():
             print(f"ERROR: File not found: {f}")
             sys.exit(1)
 
-    log(f"LCMS Toolkit Analysis", args.quiet)
+    log(f"MassKit Analysis", args.quiet)
     log(f"  Files: {len(args.files)}", args.quiet)
     log(f"  Output: {args.output_dir}/", args.quiet)
     t_start = time.time()

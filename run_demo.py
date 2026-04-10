@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LCMS Toolkit - Full Demo
+MassKit - Full Demo
 Run all features with synthetic data. No input files needed.
 
 Usage:
@@ -13,7 +13,7 @@ import sys
 import os
 import numpy as np
 
-# Ensure pylcms is importable
+# Ensure masskit is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "python"))
 
 
@@ -30,7 +30,7 @@ def header(title):
 def demo_spectrum():
     """Create and manipulate mass spectra."""
     header("1. Spectrum Operations")
-    from pylcms import Spectrum, pick_peaks, smooth_spectrum, correct_baseline, estimate_noise
+    from masskit import Spectrum, pick_peaks, smooth_spectrum, correct_baseline, estimate_noise
 
     # Build a synthetic spectrum with 5 known peaks
     mz = np.arange(100, 1000, 0.1)
@@ -74,7 +74,7 @@ def demo_spectrum():
 def demo_chromatogram():
     """Build chromatograms and an MSExperiment."""
     header("2. Chromatograms & Experiment")
-    from pylcms import Spectrum, Chromatogram, ChromatogramType, MSExperiment
+    from masskit import Spectrum, Chromatogram, ChromatogramType, MSExperiment
 
     # Build an experiment with spectra at different RTs
     exp = MSExperiment()
@@ -100,7 +100,7 @@ def demo_chromatogram():
 def demo_isotope():
     """Isotope pattern detection and charge deconvolution."""
     header("3. Isotope Detection")
-    from pylcms import Spectrum, detect_isotope_patterns, averagine_distribution, assign_charge_state
+    from masskit import Spectrum, detect_isotope_patterns, averagine_distribution, assign_charge_state
 
     # Synthetic isotope envelope at z=2
     mono_mz = 500.0
@@ -141,7 +141,7 @@ def demo_isotope():
 def demo_spectral_matching():
     """Spectral similarity and library search."""
     header("4. Spectral Matching")
-    from pylcms import (
+    from masskit import (
         Spectrum, SpectralLibrary,
         cosine_similarity, modified_cosine_similarity, spectral_entropy_similarity,
     )
@@ -173,7 +173,7 @@ def demo_spectral_matching():
 def demo_quantification():
     """Label-free quantification and normalization."""
     header("5. Quantification & Normalization")
-    from pylcms import (
+    from masskit import (
         ConsensusMap, median_normalization, quantile_normalization, tic_normalization,
         DifferentialAnalysis,
     )
@@ -209,8 +209,8 @@ def demo_quantification():
 def demo_labeling():
     """TMT/SILAC isotope labeling quantification."""
     header("6. Isotope Labeling (TMT/SILAC)")
-    from pylcms import Spectrum
-    from pylcms.labeling import (
+    from masskit import Spectrum
+    from masskit.labeling import (
         LabelingStrategy, get_reporter_ions, extract_reporter_ions,
         normalize_reporter_intensities, compute_dimethyl_shift,
     )
@@ -240,8 +240,8 @@ def demo_labeling():
 def demo_statistics():
     """PCA, PLS-DA, ANOVA, and volcano plots."""
     header("7. Statistical Analysis")
-    from pylcms import ConsensusMap
-    from pylcms.statistics import pca, plsda, anova, volcano_data
+    from masskit import ConsensusMap
+    from masskit.statistics import pca, plsda, anova, volcano_data
 
     np.random.seed(42)
     n_features, n_samples = 100, 12
@@ -285,8 +285,8 @@ def demo_statistics():
 def demo_identification():
     """Peptide identification and RT prediction."""
     header("8. Identification & RT Prediction")
-    from pylcms.identification import calculate_peptide_mass, generate_theoretical_fragments
-    from pylcms.rt_prediction import (
+    from masskit.identification import calculate_peptide_mass, generate_theoretical_fragments
+    from masskit.rt_prediction import (
         RTPredictor, compute_peptide_features, simple_ssi_prediction, HYDROPHOBICITY,
     )
 
@@ -335,8 +335,8 @@ def demo_identification():
 def demo_annotation():
     """Spectrum annotation with fragment ions."""
     header("9. Spectrum Annotation")
-    from pylcms import Spectrum
-    from pylcms.annotation import (
+    from masskit import Spectrum
+    from masskit.annotation import (
         annotate_spectrum, compute_fragment_ions, format_annotation_table,
         IonType, NeutralLoss,
     )
@@ -373,10 +373,10 @@ def demo_annotation():
 def demo_reporting():
     """Generate an HTML report."""
     header("10. Report Generation")
-    from pylcms.reporting import ReportBuilder, ReportConfig
+    from masskit.reporting import ReportBuilder, ReportConfig
 
     builder = ReportBuilder(ReportConfig(
-        title="LCMS Toolkit Demo Report",
+        title="MassKit Demo Report",
         author="Demo User",
     ))
     builder.add_summary(
@@ -401,7 +401,7 @@ def demo_reporting():
 def demo_plugins():
     """Plugin architecture and processing pipelines."""
     header("11. Plugin Architecture")
-    from pylcms.plugins import PluginRegistry, ProcessingPipeline, register_as
+    from masskit.plugins import PluginRegistry, ProcessingPipeline, register_as
 
     PluginRegistry.reset()
 
@@ -436,7 +436,7 @@ def demo_plugins():
 def demo_memmap():
     """Memory-mapped arrays for large datasets."""
     header("12. Memory-Mapped Arrays")
-    from pylcms.memmap import MemmapMatrix
+    from masskit.memmap import MemmapMatrix
     import tempfile, shutil
 
     tmpdir = tempfile.mkdtemp()
@@ -465,7 +465,7 @@ def demo_memmap():
 def demo_cloud():
     """Cloud/HPC workflow generation."""
     header("13. Cloud & HPC Integration")
-    from pylcms.cloud import generate_snakemake_workflow, generate_nextflow_workflow, HPCJobSubmitter
+    from masskit.cloud import generate_snakemake_workflow, generate_nextflow_workflow, HPCJobSubmitter
     import tempfile
 
     tmpdir = tempfile.mkdtemp()
@@ -484,8 +484,8 @@ def demo_cloud():
     # SLURM job script
     submitter = HPCJobSubmitter(scheduler="slurm")
     script = submitter.generate_script(
-        "pylcms peaks sample.mzML -o peaks.csv",
-        job_name="lcms_demo", cpus=8, memory="16G", time="1:00:00",
+        "masskit peaks sample.mzML -o peaks.csv",
+        job_name="masskit_demo", cpus=8, memory="16G", time="1:00:00",
     )
     print(f"\nSLURM job script:")
     for line in script.strip().split("\n"):
@@ -518,11 +518,11 @@ DEMOS = {
 
 def main():
     print("=" * 60)
-    print("  LCMS Toolkit - Full Feature Demo")
+    print("  MassKit - Full Feature Demo")
     print("=" * 60)
 
-    import pylcms
-    print(f"  Version: {pylcms.__version__}")
+    import masskit
+    print(f"  Version: {masskit.__version__}")
     print(f"  NumPy:   {np.__version__}")
 
     if "--list" in sys.argv:

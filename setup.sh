@@ -1,9 +1,9 @@
 #!/bin/bash
-# LCMS Toolkit - One-step setup and install
+# MassKit - One-step setup and install
 set -e
 
 echo "============================================"
-echo "  LCMS Toolkit - Setup"
+echo "  MassKit - Setup"
 echo "============================================"
 echo ""
 
@@ -20,7 +20,7 @@ echo "Python version: $PYTHON_VERSION"
 
 # Install
 echo ""
-echo "Installing pylcms..."
+echo "Installing masskit..."
 cd python
 pip install -e ".[viz,dev]" --quiet
 cd ..
@@ -32,6 +32,6 @@ echo "============================================"
 echo ""
 echo "Run the toolkit:"
 echo "  python3 run_demo.py          Full interactive demo"
-echo "  pylcms --help                CLI tool"
+echo "  masskit --help                CLI tool"
 echo "  pytest python/tests/ -v      Run tests"
 echo ""
