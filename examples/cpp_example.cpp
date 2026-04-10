@@ -1,5 +1,5 @@
 /**
- * Example usage of the LCMS C++ library.
+ * Example usage of the MassKit C++ library.
  *
  * Compile with:
  *   g++ -std=c++17 -I../core/include cpp_example.cpp -o example
@@ -206,7 +206,7 @@ void exampleTypes() {
 }
 
 int main() {
-    std::cout << "LCMS C++ Library Examples\n\n";
+    std::cout << "MassKit C++ Library Examples\n\n";
 
     try {
         exampleSpectrumOperations();

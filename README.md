@@ -1,12 +1,14 @@
 # MassKit
 
+> **Mass** Spectrometry Tool**kit** — Your complete LC-MS data analysis solution
+
 [![CI](https://github.com/masskit/masskit/actions/workflows/ci.yml/badge.svg)](https://github.com/masskit/masskit/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/masskit.svg)](https://pypi.org/project/masskit/)
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/masskit/masskit)
 [![Python](https://img.shields.io/pypi/pyversions/masskit)](https://pypi.org/project/masskit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A production-ready, cross-platform toolkit for **LC-MS (Liquid Chromatography-Mass Spectrometry)** data analysis. Implementations in **Python** (primary), **C++** (core), and **Java** (CLI + GUI), with a unified API for mass spectrometry data processing, quantification, identification, and statistical analysis.
+**MassKit** (**Mass** Spectrometry Tool**kit**) is a production-ready, cross-platform toolkit for **LC-MS (Liquid Chromatography-Mass Spectrometry)** data analysis. Implementations in **Python** (primary), **C++** (core), and **Java** (CLI + GUI), with a unified API for mass spectrometry data processing, quantification, identification, and statistical analysis.
 
 **479 tests | 80% coverage | zero deprecation warnings | tested against real public mzML files from HUPO-PSI**
 

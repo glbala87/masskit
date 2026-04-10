@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.14)
-project(lcms_core VERSION 1.0.0 LANGUAGES CXX)
+project(masskit_core VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Options
-option(LCMS_BUILD_TESTS "Build unit tests" ON)
-option(LCMS_BUILD_PYTHON "Build Python bindings" OFF)
+option(MASSKIT_BUILD_TESTS "Build unit tests" ON)
+option(MASSKIT_BUILD_PYTHON "Build Python bindings" OFF)
 
 # Find dependencies
 find_package(PkgConfig QUIET)
@@ -57,17 +57,17 @@ target_include_directories(lcms_core
 if(PUGIXML_FOUND)
     target_link_libraries(lcms_core PUBLIC ${PUGIXML_LIBRARIES})
     target_include_directories(lcms_core PUBLIC ${PUGIXML_INCLUDE_DIRS})
-    target_compile_definitions(lcms_core PUBLIC LCMS_HAS_PUGIXML)
+    target_compile_definitions(lcms_core PUBLIC MASSKIT_HAS_PUGIXML)
 endif()
 
 if(ZLIB_FOUND)
     target_link_libraries(lcms_core PUBLIC ZLIB::ZLIB)
-    target_compile_definitions(lcms_core PUBLIC LCMS_HAS_ZLIB)
+    target_compile_definitions(lcms_core PUBLIC MASSKIT_HAS_ZLIB)
 endif()
 
 if(Eigen3_FOUND)
     target_link_libraries(lcms_core PUBLIC Eigen3::Eigen)
-    target_compile_definitions(lcms_core PUBLIC LCMS_HAS_EIGEN)
+    target_compile_definitions(lcms_core PUBLIC MASSKIT_HAS_EIGEN)
 endif()
 
 # Threading support for parallel processing
@@ -83,12 +83,12 @@ target_compile_options(lcms_core PRIVATE
 )
 
 # Python bindings
-if(LCMS_BUILD_PYTHON)
+if(MASSKIT_BUILD_PYTHON)
     find_package(pybind11 QUIET)
     if(pybind11_FOUND)
-        pybind11_add_module(_lcms_core bindings/python_bindings.cpp)
-        target_link_libraries(_lcms_core PRIVATE lcms_core)
-        target_compile_definitions(_lcms_core PRIVATE LCMS_BUILD_PYTHON)
+        pybind11_add_module(_masskit_core bindings/python_bindings.cpp)
+        target_link_libraries(_masskit_core PRIVATE lcms_core)
+        target_compile_definitions(_masskit_core PRIVATE MASSKIT_BUILD_PYTHON)
         message(STATUS "Building Python bindings with pybind11")
     else()
         message(WARNING "pybind11 not found - Python bindings will not be built")
@@ -96,7 +96,7 @@ if(LCMS_BUILD_PYTHON)
 endif()
 
 # Tests
-if(LCMS_BUILD_TESTS)
+if(MASSKIT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests EXCLUDE_FROM_ALL)
 endif()

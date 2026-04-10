@@ -1,12 +1,14 @@
 # MassKit
 
+> **Mass** Spectrometry Tool**kit** — Your complete LC-MS data analysis solution
+
 [![CI](https://github.com/masskit/masskit/actions/workflows/ci.yml/badge.svg)](https://github.com/masskit/masskit/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/masskit.svg)](https://pypi.org/project/masskit/)
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/masskit/masskit)
 [![Python](https://img.shields.io/pypi/pyversions/masskit)](https://pypi.org/project/masskit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Production-ready Python toolkit for LC-MS (Liquid Chromatography-Mass Spectrometry) data analysis. NumPy-native data structures, mzML/mzXML I/O (including legacy 0.99.x), peak picking, feature detection, quantification, identification, statistics, and reporting.
+**MassKit** (**Mass** Spectrometry Tool**kit**) — a production-ready Python toolkit for LC-MS (Liquid Chromatography-Mass Spectrometry) data analysis. NumPy-native data structures, mzML/mzXML I/O (including legacy 0.99.x), peak picking, feature detection, quantification, identification, statistics, and reporting.
 
 **479 tests | 80% coverage | zero deprecation warnings | tested against real public mzML files**
 

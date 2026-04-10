@@ -2,7 +2,7 @@
 #include <cstring>
 #include <algorithm>
 
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
 #include <zlib.h>
 #endif
 
@@ -246,7 +246,7 @@ std::size_t Base64::decodedSize(const std::string& input) {
     return (len * 3) / 4 - padding;
 }
 
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
 std::vector<std::uint8_t> Zlib::decompress(const std::vector<std::uint8_t>& input) {
     if (input.empty()) {
         return {};
@@ -363,7 +363,7 @@ std::vector<float> Zlib::decompressFloat32(const std::string& base64_input,
 
     return result;
 }
-#endif // LCMS_HAS_ZLIB
+#endif // MASSKIT_HAS_ZLIB
 
 } // namespace io
 } // namespace lcms

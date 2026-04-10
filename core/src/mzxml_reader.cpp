@@ -5,7 +5,7 @@
 #include <regex>
 #include <cstring>
 
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
 #include <pugixml.hpp>
 #endif
 
@@ -17,7 +17,7 @@ public:
     Impl() = default;
 
     MSExperiment read(const std::string& filename, const MzXMLReaderOptions& options) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         return readWithPugixml(filename, options);
 #else
         return readFallback(filename, options);
@@ -26,7 +26,7 @@ public:
 
     MSExperiment parseString(const std::string& content,
                              const MzXMLReaderOptions& options) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         return parseStringWithPugixml(content, options);
 #else
         return parseStringFallback(content, options);
@@ -34,7 +34,7 @@ public:
     }
 
     std::size_t countSpectra(const std::string& filename) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         pugi::xml_document doc;
         if (!doc.load_file(filename.c_str())) {
             throw MzXMLParseError("Failed to load file: " + filename);
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
     MSExperiment readWithPugixml(const std::string& filename,
                                   const MzXMLReaderOptions& options) {
         pugi::xml_document doc;
@@ -281,7 +281,7 @@ private:
 
                 try {
                     if (is_compressed) {
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
                         if (is_64bit) {
                             values = Zlib::decompressFloat64(base64_data, is_little_endian);
                         } else {
@@ -342,7 +342,7 @@ private:
 
         return spec;
     }
-#endif // LCMS_HAS_PUGIXML
+#endif // MASSKIT_HAS_PUGIXML
 
     // Fallback implementation
     MSExperiment readFallback(const std::string& filename,

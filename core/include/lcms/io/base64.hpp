@@ -106,7 +106,7 @@ private:
                            std::size_t count);
 };
 
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
 /**
  * @brief Zlib compression/decompression utilities.
  */
@@ -152,7 +152,7 @@ public:
     static std::vector<float> decompressFloat32(const std::string& base64_input,
                                                 bool little_endian = true);
 };
-#endif // LCMS_HAS_ZLIB
+#endif // MASSKIT_HAS_ZLIB
 
 } // namespace io
 } // namespace lcms

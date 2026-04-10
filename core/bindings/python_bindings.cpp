@@ -1,16 +1,16 @@
 /**
  * @file python_bindings.cpp
- * @brief pybind11 bindings for the LCMS C++ core library.
+ * @brief pybind11 bindings for the MassKit C++ core library.
  *
  * Build with:
  *   pip install pybind11
- *   cmake -DLCMS_BUILD_PYTHON=ON ..
+ *   cmake -DMASSKIT_BUILD_PYTHON=ON ..
  *
  * Provides Python access to the high-performance C++ implementations
  * of spectrum processing, peak picking, isotope detection, and more.
  */
 
-#ifdef LCMS_BUILD_PYTHON
+#ifdef MASSKIT_BUILD_PYTHON
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -30,8 +30,8 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(_lcms_core, m) {
-    m.doc() = "LCMS C++ core library Python bindings";
+PYBIND11_MODULE(_masskit_core, m) {
+    m.doc() = "MassKit C++ core library Python bindings";
 
     // =====================================================================
     // Enums
@@ -220,4 +220,4 @@ PYBIND11_MODULE(_lcms_core, m) {
     m.attr("__version__") = "1.0.0";
 }
 
-#endif // LCMS_BUILD_PYTHON
+#endif // MASSKIT_BUILD_PYTHON

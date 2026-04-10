@@ -2,9 +2,9 @@
 
 /**
  * @file lcms.hpp
- * @brief Main header for the LCMS Core library.
+ * @brief Main header for the MassKit Core library.
  *
- * Include this header to get access to all LCMS core functionality.
+ * Include this header to get access to all MassKit core functionality.
  *
  * @example
  * @code
@@ -46,7 +46,7 @@
 
 /**
  * @namespace lcms
- * @brief Root namespace for the LCMS library.
+ * @brief Root namespace for the MassKit library.
  */
 
 /**

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of the PyLCMS library.
+Example usage of the MassKit library.
 
 This script demonstrates the main features of the library:
 - Loading mzML files
@@ -14,8 +14,8 @@ import numpy as np
 
 # Import the library
 try:
-    import pylcms
-    from pylcms import (
+    import masskit
+    from masskit import (
         Spectrum,
         Chromatogram,
         MSExperiment,
@@ -25,7 +25,7 @@ try:
         correct_baseline,
     )
 except ImportError:
-    print("pylcms not installed. Run: pip install -e python/")
+    print("masskit not installed. Run: pip install -e python/")
     exit(1)
 
 
@@ -121,7 +121,7 @@ def example_chromatogram():
     intensity += np.random.normal(0, 10, len(rt))
     intensity = np.maximum(intensity, 0)
 
-    from pylcms import ChromatogramType
+    from masskit import ChromatogramType
     chrom = Chromatogram(rt=rt, intensity=intensity, chrom_type=ChromatogramType.TIC)
 
     print(f"Created chromatogram: {chrom}")
@@ -186,7 +186,7 @@ def example_visualization():
         import matplotlib
         matplotlib.use('Agg')  # Non-interactive backend
         import matplotlib.pyplot as plt
-        from pylcms.visualization import plot_spectrum, plot_chromatogram
+        from masskit.visualization import plot_spectrum, plot_chromatogram
 
         print("Matplotlib available - creating plots...")
 
@@ -200,7 +200,7 @@ def example_visualization():
         # Plot chromatogram
         rt = np.arange(0, 600, 1.0)
         intensity = 1000 * np.exp(-0.5 * ((rt - 300) / 30) ** 2)
-        from pylcms import ChromatogramType
+        from masskit import ChromatogramType
         chrom = Chromatogram(rt=rt, intensity=intensity, chrom_type=ChromatogramType.TIC)
         plot_chromatogram(chrom, ax=axes[1], show_apex=True, title="Synthetic TIC")
 
@@ -215,8 +215,8 @@ def example_visualization():
 
 def main():
     """Run all examples."""
-    print("PyLCMS Library Examples")
-    print(f"Version: {pylcms.__version__}")
+    print("MassKit Library Examples")
+    print(f"Version: {masskit.__version__}")
     print()
 
     example_spectrum_operations()

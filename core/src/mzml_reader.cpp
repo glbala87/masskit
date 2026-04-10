@@ -5,7 +5,7 @@
 #include <regex>
 #include <cstring>
 
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
 #include <pugixml.hpp>
 #endif
 
@@ -73,7 +73,7 @@ public:
     Impl() = default;
 
     MSExperiment read(const std::string& filename, const MzMLReaderOptions& options) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         return readWithPugixml(filename, options);
 #else
         return readFallback(filename, options);
@@ -82,7 +82,7 @@ public:
 
     MSExperiment parseString(const std::string& content,
                              const MzMLReaderOptions& options) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         return parseStringWithPugixml(content, options);
 #else
         return parseStringFallback(content, options);
@@ -90,7 +90,7 @@ public:
     }
 
     std::size_t countSpectra(const std::string& filename) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         pugi::xml_document doc;
         if (!doc.load_file(filename.c_str())) {
             throw MzMLParseError("Failed to load file: " + filename);
@@ -119,7 +119,7 @@ public:
     }
 
     std::size_t countChromatograms(const std::string& filename) {
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
         pugi::xml_document doc;
         if (!doc.load_file(filename.c_str())) {
             throw MzMLParseError("Failed to load file: " + filename);
@@ -147,7 +147,7 @@ public:
     }
 
 private:
-#ifdef LCMS_HAS_PUGIXML
+#ifdef MASSKIT_HAS_PUGIXML
     MSExperiment readWithPugixml(const std::string& filename,
                                   const MzMLReaderOptions& options) {
         pugi::xml_document doc;
@@ -398,7 +398,7 @@ private:
                 std::vector<double> decoded;
                 try {
                     if (is_compressed) {
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
                         if (is_64bit) {
                             decoded = Zlib::decompressFloat64(base64_data, true);
                         } else {
@@ -508,7 +508,7 @@ private:
 
                 std::vector<double> decoded;
                 if (is_compressed) {
-#ifdef LCMS_HAS_ZLIB
+#ifdef MASSKIT_HAS_ZLIB
                     if (is_64bit) {
                         decoded = Zlib::decompressFloat64(base64_data, true);
                     } else {
@@ -544,7 +544,7 @@ private:
 
         return chrom;
     }
-#endif // LCMS_HAS_PUGIXML
+#endif // MASSKIT_HAS_PUGIXML
 
     // Fallback implementation using simple regex parsing
     MSExperiment readFallback(const std::string& filename,
