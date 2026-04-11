@@ -25,7 +25,7 @@ FROM python:3.12-slim AS runtime
 
 LABEL org.opencontainers.image.title="MassKit"
 LABEL org.opencontainers.image.description="LC-MS Data Analysis Toolkit"
-LABEL org.opencontainers.image.source="https://github.com/lcms-toolkit/lcms-toolkit"
+LABEL org.opencontainers.image.source="https://github.com/glbala87/masskit"
 LABEL org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

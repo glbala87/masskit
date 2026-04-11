@@ -22,7 +22,7 @@ import java.util.List;
  * with peak annotation, zoom/pan, and file browsing.
  *
  * Usage:
- *   java -jar lcms-toolkit.jar
+ *   java -jar masskit.jar
  *   or: LCMSViewer.launch(args)
  */
 public class LCMSViewer extends Application {
@@ -38,7 +38,7 @@ public class LCMSViewer extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        primaryStage.setTitle("LCMS Toolkit Viewer");
+        primaryStage.setTitle("MassKit Viewer");
 
         BorderPane root = new BorderPane();
 
@@ -333,8 +333,8 @@ public class LCMSViewer extends Application {
 
     private void showAbout() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("About LCMS Toolkit Viewer");
-        alert.setHeaderText("LCMS Toolkit v1.0.0");
+        alert.setTitle("About MassKit Viewer");
+        alert.setHeaderText("MassKit v1.0.0");
         alert.setContentText("LC-MS Data Analysis Toolkit\n\n"
             + "A multi-language platform for liquid chromatography\n"
             + "mass spectrometry data analysis.\n\n"

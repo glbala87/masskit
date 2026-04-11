@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Python (pylcms package)
+  # Python (masskit package)
   - package-ecosystem: "pip"
     directory: "/python"
     schedule:

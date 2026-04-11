@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.lcms</groupId>
-    <artifactId>lcms-java</artifactId>
+    <artifactId>masskit-java</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>LCMS Java Tools</name>
-    <description>Java CLI tools and GUI for LC-MS data analysis</description>
+    <name>MassKit Java Tools</name>
+    <description>Java CLI tools and GUI for MassKit LC-MS data analysis</description>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
